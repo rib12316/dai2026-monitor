@@ -1,0 +1,49 @@
+name: DAI 2026 Deadline Monitor
+
+on:
+  schedule:
+    # UTC 01:00 = 北京时间 09:00，每天一次
+    # 注意: GitHub Actions 的 schedule 可能延迟几分钟到几十分钟，属正常现象
+    - cron: "0 1 * * *"
+  workflow_dispatch: {}  # 允许在 Actions 页面手动点击触发，方便首次验证
+
+permissions:
+  contents: write  # 需要写权限以提交 last_dates.json 的变更
+
+concurrency:
+  group: dai2026-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run monitor
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python monitor.py
+
+      - name: Commit state file if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [[ -n "$(git status --porcelain last_dates.json)" ]]; then
+            git add last_dates.json
+            git commit -m "chore: update deadline snapshot [skip ci]"
+            git push
+            echo "Pushed updated snapshot."
+          else
+            echo "No snapshot change, nothing to push."
+          fi

@@ -1,0 +1,60 @@
+{
+  "updated_at": "2026-07-21T08:48:17",
+  "url": "https://www.adai.ai/dai/2026/research-track.html",
+  "dates": [
+    {
+      "milestone": "Submission System Opens",
+      "date_raw": "<s>12 Jun 2026</s> <time datetime=\"2026-06-30\">30 Jun 2026</time>",
+      "notes": "OpenReview opens for abstract registration and paper uploads",
+      "start": "2026-06-30"
+    },
+    {
+      "milestone": "Abstract Registration Deadline",
+      "date_raw": "<time datetime=\"2026-07-27\">27 Jul 2026</time>",
+      "notes": "Required before full-paper submission",
+      "start": "2026-07-27"
+    },
+    {
+      "milestone": "Research Track Submission Deadline",
+      "date_raw": "<time datetime=\"2026-08-03\">03 Aug 2026</time>",
+      "notes": "Full research paper due",
+      "start": "2026-08-03"
+    },
+    {
+      "milestone": "Review Period",
+      "date_raw": "<time datetime=\"2026-08-06\" data-end-date=\"2026-09-16\">06 Aug - 16 Sep 2026</time>",
+      "notes": "Compact review process",
+      "start": "2026-08-06"
+    },
+    {
+      "milestone": "Research Track Notification",
+      "date_raw": "<time datetime=\"2026-09-16\">16 Sep 2026</time>",
+      "notes": "Author decisions",
+      "start": "2026-09-16"
+    },
+    {
+      "milestone": "Camera-Ready Deadline",
+      "date_raw": "<time datetime=\"2026-10-16\">16 Oct 2026</time>",
+      "notes": "Accepted papers",
+      "start": "2026-10-16"
+    },
+    {
+      "milestone": "Early Registration Deadline",
+      "date_raw": "<time datetime=\"2026-11-01\">01 Nov 2026</time>",
+      "notes": "-",
+      "start": "2026-11-01"
+    },
+    {
+      "milestone": "Late Registration Deadline",
+      "date_raw": "<time datetime=\"2026-11-20\">20 Nov 2026</time>",
+      "notes": "-",
+      "start": "2026-11-20"
+    },
+    {
+      "milestone": "Conference",
+      "date_raw": "<time datetime=\"2026-11-29\" data-end-date=\"2026-12-02\">29 Nov - 02 Dec 2026</time>",
+      "notes": "City University of Hong Kong",
+      "start": "2026-11-29"
+    }
+  ]
+}

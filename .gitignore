@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 本地测试残留
+__sample.html
+*.log
+
+# 编辑器
+.vscode/
+.idea/
