@@ -138,7 +138,17 @@ def diff_dates(old_list, new_list):
 
 # ============== 倒计时 ==============
 def nearest_upcoming(records, today=None):
-    """返回 (record, days_left)；没有未来日期则返回 (None, None)。"""
+    """
+    返回 (record, days_left)；没有未来日期则返回 (None, None)。
+
+    关键：用 d > today（严格大于今天）而非 d >= today。
+    原因：截止当天一般已经在赶末班车，无需再提醒；更重要的是，
+    若用 >= 会把当天(距0天)的 deadline 留作"最近"，挤掉本该接力
+    上来的下一个 deadline，造成断档。
+    例如 Abstract=7/27, Submission=8/3(差7天)：
+      - 7/27 用 >= ：Abstract(0天) 仍是最近 → Submission 推迟到 7/30 才提醒(断档3天)
+      - 7/27 用 >  ：Abstract 被排除     → Submission(7天) 立即接力 ✅
+    """
     if today is None:
         today = dt.date.today()
     candidates = []
@@ -149,7 +159,7 @@ def nearest_upcoming(records, today=None):
             d = dt.date.fromisoformat(r["start"])
         except ValueError:
             continue
-        if d >= today:
+        if d > today:
             candidates.append((d, r))
     if not candidates:
         return None, None
