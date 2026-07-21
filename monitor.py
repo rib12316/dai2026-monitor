@@ -207,18 +207,32 @@ def find_due_today(records, today=None):
             due.append(r)
     return due
 
-# ============== 邮件 ==============
-def send_mail(subject, body_html):
+# ============== 通知通道 ==============
+# 统一入口：同时尝试所有已配置的通道（邮件 / PushPlus 微信）。
+# 任一通道未配置则跳过；任一失败不影响其它通道。
+
+def notify(subject, body_html):
+    """
+    统一推送入口。返回 True 表示至少有一个通道成功。
+    并行调用所有已配置的通道，互不影响。
+    """
+    ok_any = False
+    ok_any |= _send_mail(subject, body_html)
+    ok_any |= _send_pushplus(subject, body_html)
+    if not ok_any:
+        # 所有通道都未配置或都失败时，至少留个日志
+        log(f"💤 所有通知通道均未配置或失败，仅写日志：{subject}")
+    return ok_any
+
+def _send_mail(subject, body_html):
+    """邮件通道。SMTP 环境变量不全则跳过。"""
     host = os.environ.get("SMTP_HOST")
     port = os.environ.get("SMTP_PORT", "465")
     user = os.environ.get("SMTP_USER")
     pwd = os.environ.get("SMTP_PASS")
     to = os.environ.get("MAIL_TO")
     if not all([host, user, pwd, to]):
-        log("⚠️  SMTP 环境变量不全，跳过发信(仅写日志)：")
-        log(f"    主题: {subject}")
-        log("    正文(前200字): " + re.sub(r"<[^>]+>", "", body_html)[:200])
-        return False
+        return False  # 未配置邮件，静默跳过
     msg = MIMEText(body_html, "html", "utf-8")
     msg["Subject"] = subject
     msg["From"] = formataddr(("DAI 2026 监控", user))
@@ -238,7 +252,42 @@ def send_mail(subject, body_html):
         log(f"✉️  邮件已发送: {subject} -> {to}")
         return True
     except Exception as e:
-        log(f"❌ 发信失败: {e}")
+        log(f"❌ 邮件发信失败: {e}")
+        return False
+
+def _send_pushplus(subject, body_html):
+    """
+    PushPlus 微信通道。未配置 PUSHPLUS_TOKEN 则跳过。
+    推送到 token 持有者扫码绑定的那个微信号。
+    文档：https://www.pushplus.plus/doc/guide/api.html
+    """
+    token = os.environ.get("PUSHPLUS_TOKEN")
+    if not token:
+        return False  # 未配置 PushPlus，静默跳过
+    url = "http://www.pushplus.plus/send"
+    payload = json.dumps({
+        "token": token,
+        "title": subject,
+        "content": body_html,
+        "template": "markdown",  # 支持 HTML/Markdown 渲染
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8", errors="replace"))
+        if resp_data.get("code") == 200:
+            log(f"💬 PushPlus 已推送: {subject}")
+            return True
+        else:
+            log(f"❌ PushPlus 推送失败: {resp_data}")
+            return False
+    except Exception as e:
+        log(f"❌ PushPlus 推送异常: {e}")
         return False
 
 # ============== 邮件正文构造 ==============
@@ -361,7 +410,7 @@ def main():
         for c in changes:
             log(f"    {c['milestone']}: {c['old']!r} -> {c['new']!r}")
         body = html_changes(changes, new_list)
-        sent_any |= send_mail("⚠️ [DAI 2026] 截止日期已变更", body)
+        sent_any |= notify("⚠️ [DAI 2026] 截止日期已变更", body)
     elif is_first_run:
         log("🆕 首次运行，初始化快照，不发送告警")
     else:
@@ -374,7 +423,7 @@ def main():
             log(f"🎊 今天是投稿截止日: {r['milestone']}")
             wish = random.choice(SUBMISSION_DAY_WISHES)
             body = html_submission_day(r, wish)
-            sent_any |= send_mail(
+            sent_any |= notify(
                 f"🎉 [DAI 2026] 今天是 {r['milestone']}，祝你中稿！",
                 body,
             )
@@ -387,7 +436,7 @@ def main():
             if days <= REMAIN_DAYS_THRESHOLD:
                 wish = random.choice(WISHES)
                 body = html_countdown(rec, days, wish)
-                sent_any |= send_mail(
+                sent_any |= notify(
                     f"📅 DAI 2026 ｜ 离 {rec['milestone']} 还有 {days} 天",
                     body,
                 )
