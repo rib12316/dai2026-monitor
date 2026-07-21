@@ -48,6 +48,25 @@ WISHES = [
     "做你自己就好，不必和别人比节奏，你的路有你的风景 🌸",
 ]
 
+# 投稿类截止节点 —— 这些节点的截止当天会单独发一封"祝中稿"邮件，而非普通倒计时
+# (Camera-Ready/Registration/Conference 不算投稿，所以不在这里)
+SUBMISSION_DEADLINE_NODES = [
+    "Abstract Registration Deadline",
+    "Research Track Submission Deadline",
+]
+
+# 投稿截止当天专用祝福语池 —— 表达"希望中稿"的祝愿，可自由增减
+SUBMISSION_DAY_WISHES = [
+    "今天就是投稿日啦，一路辛苦了！愿你这篇论文被审稿人慧眼识珠，顺利中稿 🎉",
+    "提交的那一刻，所有的熬夜和咖啡都值了。祝好运降临，静候佳音，中稿中稿！🍀",
+    "按下 Submit 键，就把剩下的交给时间和运气吧 —— 祝你这次旗开得胜、成功录用 ✨",
+    "从选题到今天，你走了很远的路。愿这份努力被看见，愿好消息如期而至 🌟",
+    "投稿只是新的开始，愿审稿人都温柔以待，愿 accept 的邮件早日到你的收件箱 📬",
+    "今天提交，明天就可以好好歇一口气啦。祝你 Paper 顺风顺水，Accept 必达！🚀",
+    "每一稿的修改都是通向中稿的台阶，你已经走到最后一级了。祝你一击即中！🎯",
+    "愿你所有的 reviewer 都是懂你的人，愿 rebuttal 永远用不上，直接 accept 💯",
+]
+
 # ============== 日志 ==============
 def log(msg):
     print(f"[{dt.datetime.now().isoformat(timespec='seconds')}] {msg}", flush=True)
@@ -167,6 +186,27 @@ def nearest_upcoming(records, today=None):
     nearest_d, nearest_r = candidates[0]
     return nearest_r, (nearest_d - today).days
 
+def find_due_today(records, today=None):
+    """
+    返回 list[record]：今天正好截止、且属于投稿类节点(Abstract/Submission)的记录。
+    这些节点当天不发普通倒计时，改发"祝中稿"特殊邮件。
+    """
+    if today is None:
+        today = dt.date.today()
+    due = []
+    for r in records:
+        if r["milestone"] not in SUBMISSION_DEADLINE_NODES:
+            continue
+        if not r["start"]:
+            continue
+        try:
+            d = dt.date.fromisoformat(r["start"])
+        except ValueError:
+            continue
+        if d == today:
+            due.append(r)
+    return due
+
 # ============== 邮件 ==============
 def send_mail(subject, body_html):
     host = os.environ.get("SMTP_HOST")
@@ -255,6 +295,25 @@ def html_countdown(record, days, wish):
     </div>
     """
 
+def html_submission_day(record, wish):
+    """投稿截止当天专用邮件正文。"""
+    name = record["milestone"]
+    date_str = _strip_tags(record["date_raw"])
+    return f"""
+    <div style="font-family:-apple-system,'Segoe UI',sans-serif;color:#333;max-width:560px;">
+      <h2 style="color:#1a73e8;">🎉 DAI 2026 ｜ 今天是 <span style="color:#d33;">{name}</span> 🎉</h2>
+      <p>日期：<b>{date_str}</b>（AoE, UTC-12）</p>
+      <p>所有该交的都已经在路上了 —— 接下来就交给审稿人和时间了。</p>
+      <p style="margin-top:16px;padding:14px 18px;background:#fff8e1;border-left:3px solid #ffa000;border-radius:4px;font-size:15px;">
+        {wish}
+      </p>
+      <p style="margin-top:16px;font-size:13px;">
+        📄 <a href="{URL}">查看完整 Call for Papers</a>
+      </p>
+      <p style="margin-top:12px;color:#888;font-size:12px;">—— 投稿日快乐，等你 accept 的好消息 ✨</p>
+    </div>
+    """
+
 # ============== 主流程 ==============
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -308,23 +367,36 @@ def main():
     else:
         log("✅ 日期无变更")
 
-    # 2) 倒计时
-    rec, days = nearest_upcoming(new_list)
-    if rec is not None:
-        log(f"📅 最近截止: {rec['milestone']}，距今 {days} 天")
-        if days <= REMAIN_DAYS_THRESHOLD:
-            wish = random.choice(WISHES)
-            body = html_countdown(rec, days, wish)
+    # 2) 投稿截止当天 → 发"祝中稿"邮件(当天只发这一封，不再发倒计时)
+    due_today = find_due_today(new_list)
+    if due_today:
+        for r in due_today:
+            log(f"🎊 今天是投稿截止日: {r['milestone']}")
+            wish = random.choice(SUBMISSION_DAY_WISHES)
+            body = html_submission_day(r, wish)
             sent_any |= send_mail(
-                f"📅 DAI 2026 ｜ 离 {rec['milestone']} 还有 {days} 天",
+                f"🎉 [DAI 2026] 今天是 {r['milestone']}，祝你中稿！",
                 body,
             )
-        else:
-            log(f"💤 距截止还有 {days} 天(>{REMAIN_DAYS_THRESHOLD})，今日不发倒计时邮件")
-    else:
-        log("ℹ️  没有未来截止日期(可能会议已结束)")
 
-    # 3) 保存快照(无论是否发信都存，作为下次对比基准)
+    # 3) 倒计时(若今天已发投稿当天祝福，则跳过，避免一天两封)
+    if not due_today:
+        rec, days = nearest_upcoming(new_list)
+        if rec is not None:
+            log(f"📅 最近截止: {rec['milestone']}，距今 {days} 天")
+            if days <= REMAIN_DAYS_THRESHOLD:
+                wish = random.choice(WISHES)
+                body = html_countdown(rec, days, wish)
+                sent_any |= send_mail(
+                    f"📅 DAI 2026 ｜ 离 {rec['milestone']} 还有 {days} 天",
+                    body,
+                )
+            else:
+                log(f"💤 距截止还有 {days} 天(>{REMAIN_DAYS_THRESHOLD})，今日不发倒计时邮件")
+        else:
+            log("ℹ️  没有未来截止日期(可能会议已结束)")
+
+    # 4) 保存快照(无论是否发信都存，作为下次对比基准)
     save_state(new_list)
     log(f"💾 快照已写入 {STATE_FILE}")
     log("完成" if sent_any else "完成(本次未发信)")
