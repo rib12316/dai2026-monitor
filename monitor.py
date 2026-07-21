@@ -258,37 +258,46 @@ def _send_mail(subject, body_html):
 def _send_pushplus(subject, body_html):
     """
     PushPlus 微信通道。未配置 PUSHPLUS_TOKEN 则跳过。
-    推送到 token 持有者扫码绑定的那个微信号。
+    支持群发：PUSHPLUS_TOKEN 可填多个 token，用英文逗号分隔，
+    每个 token 对应一个接收者微信号，会逐个推送（任一失败不影响其它）。
     文档：https://www.pushplus.plus/doc/guide/api.html
     """
-    token = os.environ.get("PUSHPLUS_TOKEN")
-    if not token:
+    raw = os.environ.get("PUSHPLUS_TOKEN")
+    if not raw:
         return False  # 未配置 PushPlus，静默跳过
-    url = "http://www.pushplus.plus/send"
-    payload = json.dumps({
-        "token": token,
-        "title": subject,
-        "content": body_html,
-        "template": "markdown",  # 支持 HTML/Markdown 渲染
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8", errors="replace"))
-        if resp_data.get("code") == 200:
-            log(f"💬 PushPlus 已推送: {subject}")
-            return True
-        else:
-            log(f"❌ PushPlus 推送失败: {resp_data}")
-            return False
-    except Exception as e:
-        log(f"❌ PushPlus 推送异常: {e}")
+    tokens = [t.strip() for t in raw.split(",") if t.strip()]
+    if not tokens:
         return False
+    url = "http://www.pushplus.plus/send"
+    ok_any = False
+    for idx, token in enumerate(tokens, 1):
+        payload = json.dumps({
+            "token": token,
+            "title": subject,
+            "content": body_html,
+            "template": "markdown",  # 支持 HTML/Markdown 渲染
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+                resp_data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            if resp_data.get("code") == 200:
+                # 只显示 token 前6位，避免日志泄露完整 token
+                masked = token[:6] + "..." if len(token) > 6 else token
+                log(f"💬 PushPlus 已推送 [{idx}/{len(tokens)}] -> {masked}: {subject}")
+                ok_any = True
+            else:
+                masked = token[:6] + "..." if len(token) > 6 else token
+                log(f"❌ PushPlus 推送失败 [{idx}/{len(tokens)}] -> {masked}: {resp_data}")
+        except Exception as e:
+            masked = token[:6] + "..." if len(token) > 6 else token
+            log(f"❌ PushPlus 推送异常 [{idx}/{len(tokens)}] -> {masked}: {e}")
+    return ok_any
 
 # ============== 邮件正文构造 ==============
 def html_changes(changes, new_list):
