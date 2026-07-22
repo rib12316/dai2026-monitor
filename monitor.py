@@ -442,7 +442,11 @@ def main():
         rec, days = nearest_upcoming(new_list)
         if rec is not None:
             log(f"📅 最近截止: {rec['milestone']}，距今 {days} 天")
-            if days <= REMAIN_DAYS_THRESHOLD:
+            # QUIET_MODE: 临时测试用(如高频 cron 验证 schedule)，只写日志不发倒计时邮件
+            quiet = os.environ.get("QUIET_MODE", "").lower() in ("1", "true", "yes")
+            if quiet:
+                log(f"🔇 QUIET_MODE 开启，跳过倒计时邮件发送(仅日志)")
+            elif days <= REMAIN_DAYS_THRESHOLD:
                 wish = random.choice(WISHES)
                 body = html_countdown(rec, days, wish)
                 sent_any |= notify(
