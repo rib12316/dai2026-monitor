@@ -2,8 +2,10 @@ name: DAI 2026 Deadline Monitor
 
 on:
   schedule:
-    # ⚠️ 临时测试: 每5分钟跑一次，验证 schedule 是否生效。测完改回 "0 1 * * *"
-    - cron: "*/5 * * * *"
+    # UTC 01:00 = Beijing 09:00, runs once daily
+    # (备选：也可通过 cron-job.org 调用 repository_dispatch 外部触发)
+    - cron: "0 1 * * *"
+  repository_dispatch: {}  # 允许外部 API 触发(cron-job.org 用)
   workflow_dispatch: {}  # Allow manual trigger from Actions page
 
 permissions:
@@ -33,7 +35,6 @@ jobs:
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
-          QUIET_MODE: "1"  # ⚠️ 临时测试: 避免高频 cron 发邮件轰炸。测完删掉这行
         run: python monitor.py
 
       - name: Commit state file if changed
