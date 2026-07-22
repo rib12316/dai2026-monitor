@@ -2,10 +2,10 @@ name: DAI 2026 Deadline Monitor
 
 on:
   schedule:
-    # UTC 01:00 = 北京时间 09:00，每天一次
-    # 注意: GitHub Actions 的 schedule 可能延迟几分钟到几十分钟，属正常现象
+    # UTC 01:00 = Beijing 09:00, runs once daily
+    # Note: GitHub Actions schedule may be delayed by several minutes
     - cron: "0 1 * * *"
-  workflow_dispatch: {}  # 允许在 Actions 页面手动点击触发，方便首次验证
+  workflow_dispatch: {}  # Allow manual trigger from Actions page
 
 permissions:
   contents: write  # 需要写权限以提交 last_dates.json 的变更
